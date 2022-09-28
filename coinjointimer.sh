@@ -65,6 +65,16 @@ i=0
 while [ $i -lt $maxCoinjoinRounds ]
 do
 	coinjoin
+	
+	 ((i++))
+    	
+    	if [ $i -eq $maxCoinjoinRounds ];
+      then
+      
+      	echo "Last (of $maxCoinjoinRounds) conjoins successfully finished"
+      
+      exit 0
+      fi
 
 	hoursToWait=$[secondsToWait / 3600]
 
@@ -74,11 +84,7 @@ do
 
 	sleep $secondsToWait 
 
-	((i++))
-
 	echo "Ready for next coinjoin"
 
 done
-
-	echo "Last (of $maxCoinjoinRounds) conjoins successfully finished"
 	
