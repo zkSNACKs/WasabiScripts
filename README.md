@@ -27,7 +27,7 @@ To randomize the time that Wasabi starts and stops to coinjoin.
 #### Prerequisites
 `wcli` has to be in the same folder.
 #### How to use
-`./coinjointimer.sh walletName="WALLET" password="PASSWORD" hours=12 maxCoinjoinRounds=6`
+`./coinjointimer.sh walletName="WALLET" hours=12 maxCoinjoinRounds=6`
 
 `walletName` is the wallets name, `password` is the wallets password, `hours` is wait time period randomized by +-20%, `maxCoinjoinRounds` the number of coinjoins that should happen. In the above example, one coinjoin should happen every 12 hours, and in total 6 coinjoins, so the ceremony should be concluded in 72 hours.
 
