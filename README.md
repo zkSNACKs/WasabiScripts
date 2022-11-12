@@ -33,3 +33,10 @@ To randomize the time that Wasabi starts and stops to coinjoin.
 
 `Example of hours argument usage`: `hours=100` - first and every other conjoin will start between `80-120`hours.
 Value of hours between coinjoins is generated each time separately, so wait hour time for first coinjoin in this example should be randomly generated let say to `115` hours, for second coinjoin `81` for third `97` and so on.
+
+## coinjoin stop
+Stop the coinjoin after one successful round.
+#### Prerequisites
+`wcli` has to be in the same folder.
+#### How to use
+`./coinjointimer.sh walletName="WALLET"`
