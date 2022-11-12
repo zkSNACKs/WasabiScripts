@@ -48,7 +48,7 @@ sleep $secondsToWait
 
 function coinjoin() {
 
-./wcli.sh startcoinjoin $password true true
+./wcli.sh startcoinjoin true true
 
 echo "Coinjoining started"
 
