@@ -39,4 +39,4 @@ Stop the coinjoin after one successful round.
 #### Prerequisites
 `wcli` has to be in the same folder.
 #### How to use
-`./coinjointimer.sh wallet="WALLET"`
+`./coinjointimer.sh WALLET`
