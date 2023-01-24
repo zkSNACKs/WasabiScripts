@@ -1,69 +1,86 @@
+#if INTERACTIVE
+#r "nuget:FSharp.Data"
+#endif 
+
 open System
 open System.IO
+open System.Net.Http
+open FSharp.Data
 
-type Row = { tx: string; idx: int; amount:int64; anonset:int; confirmed:bool; confirmations:int; address:string; spentBy:string; path:string}
-let toGraph (tx: string * Row list) : string =
-  let txid, outs = tx
-  let indexes = outs |> List.map (fun x -> string x.idx) |> String.concat "|"
-  let paths   = outs |> List.map (fun x -> x.path) |> String.concat "|"
-  let anonsets = outs |> List.map (fun x -> string x.anonset) |> String.concat "|"
-  let addresses = outs |> List.map (fun x -> x.address) |> String.concat "|"
-  let amounts = outs |> List.map (fun x -> $"<idx{x.idx}>{x.amount}") |> String.concat "|"
-  let outputs = $"{{ {{ Index | {indexes} }} | {{ Path | {paths} }} | {{ AnonSet | {anonsets} }} | {{ Address | {addresses} }} | {{ Amount | {amounts} }} }}"
-  let edges   = outs |> List.filter (fun x -> x.spentBy <> "") |> List.map (fun x -> $"tx{x.tx}:idx{x.idx} -> tx{x.spentBy}") |> String.concat ";\n    "
-  $"tx{txid} [label=\"Tx Id: {txid}|{{{{ {outputs} }} }}}}\"];\n    {edges}"
+type Config = JsonProvider<"""{
+  "JsonRpcServerEnabled": true,
+  "JsonRpcUser": "",
+  "JsonRpcPassword": "",
+  "JsonRpcServerPrefixes": [
+    "http://127.0.0.1:37128/"
+  ]
+}""">
 
-let tableArray = 
-  fun _ -> Console.ReadLine()
-  |> Seq.initInfinite
-  |> Seq.takeWhile ((<>) null)
-  |> List.ofSeq
-  |> List.tail 
-  |> List.map (fun l -> l.Split(" ", StringSplitOptions.RemoveEmptyEntries))
-  |> List.map (fun e -> { tx = e[0]; idx = int e[1]; amount = int64 e[2]; anonset = int e[3]; confirmed = (if e[4] = "true" then true else false); confirmations = int e[5]; address = e[7]; path = e[6]; spentBy = (if e.Length = 9 then e[8] else "") })
-  |> List.groupBy (fun x -> x.tx) 
-  |> List.map toGraph 
+type RpcResponse = JsonProvider<"""{
+  "result": [
+     {"txid":"73af1dd","index":0,"amount":2390000,"anonymitySet":"a1.0","confirmed":true,"confirmations":116,"keyPath":"84/0","address":"tb1q","spentBy":"2d7c3f"}
+  ]
+}""">
+
+let config = Config.Load(
+  Path.Combine (
+    Environment.ExpandEnvironmentVariables ("%HOME%/.walletwasabi/client/"),
+    "Config.json"))
+
+let args = Environment.GetCommandLineArgs()
+let walletname = args[2]
+let firstTxId = args[3] 
+
+let http = new HttpClient()
+let rpcJsonResponseAsync () = async {
+  let content = new StringContent ($"{{\"jsonrpc\":\"2.0\", \"id\":\"id\", \"method\":\"selectwallet\", \"params\":[\"{walletname}\"]}}")
+  let! response = http.PostAsync(config.JsonRpcServerPrefixes[0], content) |> Async.AwaitTask
+
+  let content = new StringContent ("{\"jsonrpc\":\"2.0\", \"id\":\"id\", \"method\":\"listcoins\"}")
+  let! response = http.PostAsync(config.JsonRpcServerPrefixes[0], content) |> Async.AwaitTask
+  let! jsonResult = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+  return RpcResponse.Parse(jsonResult)
+} 
+
+let rpcJsonResult = rpcJsonResponseAsync () |> Async.RunSynchronously
+
+let coins = 
+    rpcJsonResult.Result 
+    |> Array.skipWhile (fun x -> x.Txid <> firstTxId)
+
+let coinsGroupedByTx =
+    coins
+    |> Array.groupBy (fun x -> x.Txid)
+
+let graphNodes = 
+    coinsGroupedByTx
+    |> Seq.map ( fun (txid, outs) ->
+      let indexes = outs |> Array.map (fun x -> string x.Index) |> String.concat "|"
+      let paths = outs |> Array.map (fun x -> x.KeyPath) |> String.concat "|"
+      let anonsets = outs |> Array.map (fun x -> x.AnonymitySet) |> String.concat "|"
+      let amounts = outs |> Array.map (fun x -> $"<idx{x.Index}>{x.Amount}") |> String.concat "|"
+      let addresses = outs |> Array.map (fun x -> x.Address) |> String.concat "|" 
+      $"tx{txid} [label=\"Tx Id: {txid[..8]}|{{{{ {{ {{ PrvScore | {anonsets} }} | {{ Path | {paths} }} | {{ Idx | {indexes} }} | {{ Address | {addresses} }} |  {{ Amount | {amounts} }} }}}} }}}}\"]"
+    )
+    |> List.ofSeq
+        
+let graphEdges =
+    coins 
+    |> Array.filter (fun x -> x.SpentBy <> "")
+    |> Array.map (fun x -> $"tx{x.Txid}:idx{x.Index} -> tx{x.SpentBy}")
+    |> List.ofArray
+
+let allLines =
+    graphNodes @ graphEdges
+    |> String.concat ";\n"
 
 let str = $"""
 digraph G {{
-    graph [center=1 rankdir=LR; overlap=false; splines=true;];
-    edge [dir=forward];
-    node [shape=record; ordering="in" ];
-    {tableArray |> String.concat ";\n    "};
-}}"""
-
-Console.WriteLine(str)open System
-open System.IO
-
-type Row = { tx: string; idx: int; amount:int64; anonset:int; confirmed:bool; confirmations:int; address:string; spentBy:string; path:string}
-let toGraph (tx: string * Row list) : string =
-  let txid, outs = tx
-  let indexes = outs |> List.map (fun x -> string x.idx) |> String.concat "|"
-  let paths   = outs |> List.map (fun x -> x.path) |> String.concat "|"
-  let anonsets = outs |> List.map (fun x -> string x.anonset) |> String.concat "|"
-  let addresses = outs |> List.map (fun x -> x.address) |> String.concat "|"
-  let amounts = outs |> List.map (fun x -> $"<idx{x.idx}>{x.amount}") |> String.concat "|"
-  let outputs = $"{{ {{ Index | {indexes} }} | {{ Path | {paths} }} | {{ AnonSet | {anonsets} }} | {{ Address | {addresses} }} | {{ Amount | {amounts} }} }}"
-  let edges   = outs |> List.filter (fun x -> x.spentBy <> "") |> List.map (fun x -> $"tx{x.tx}:idx{x.idx} -> tx{x.spentBy}") |> String.concat ";\n    "
-  $"tx{txid} [label=\"Tx Id: {txid}|{{{{ {outputs} }} }}}}\"];\n    {edges}"
-
-let tableArray = 
-  fun _ -> Console.ReadLine()
-  |> Seq.initInfinite
-  |> Seq.takeWhile ((<>) null)
-  |> List.ofSeq
-  |> List.tail 
-  |> List.map (fun l -> l.Split(" ", StringSplitOptions.RemoveEmptyEntries))
-  |> List.map (fun e -> { tx = e[0]; idx = int e[1]; amount = int64 e[2]; anonset = int e[3]; confirmed = (if e[4] = "true" then true else false); confirmations = int e[5]; address = e[7]; path = e[6]; spentBy = (if e.Length = 9 then e[8] else "") })
-  |> List.groupBy (fun x -> x.tx) 
-  |> List.map toGraph 
-
-let str = $"""
-digraph G {{
-    graph [center=1 rankdir=LR; overlap=false; splines=true;];
-    edge [dir=forward];
-    node [shape=record; ordering="in" ];
-    {tableArray |> String.concat ";\n    "};
+graph [center=1 rankdir=LR; overlap=false; splines=true;];
+edge [dir=forward];
+node [shape=record; ordering="in" ];
+{allLines}
 }}"""
 
 Console.WriteLine(str)
+
