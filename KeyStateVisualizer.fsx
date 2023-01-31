@@ -54,7 +54,7 @@ let keys =
 let filterByKeyPath (keys: KeyInfo list) (kp: string) =
     keys
     |> List.filter (fun k -> k.Path.StartsWith kp)
-    |> List.sortBy (fun k -> Array.last (k.Path.Split [|'/'|]))
+    |> List.sortBy (fun k -> int <| Array.last (k.Path.Split [|'/'|]))
 
 let stateToHeat (key: KeyInfo) =
     key.State
